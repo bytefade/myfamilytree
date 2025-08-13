@@ -156,6 +156,9 @@
                 <span v-if="person.deathDate"> | Falec: {{ person.deathDate }}</span>
               </p>
               <p class="text-sm">Status: {{ person.validated ? 'Validado' : 'Pendente' }}</p>
+              <p v-if="person.relationships && person.relationships.length" class="text-sm text-gray-700">
+                Relações: {{ person.relationships.join(', ') }}
+              </p>
             </div>
           </div>
           <div v-if="expandedNodes.has(person.id)" class="ml-4">
@@ -207,7 +210,7 @@
                 setup() {
                     const tree = ref([]);
                     const newPerson = ref({
-                        id: `${Date.now().toString()}-${Math.floor(Math.random() * 1000)}`, // Garante unicidade inicial
+                        id: `${Date.now().toString()}-${Math.floor(Math.random() * 1000)}`,
                         name: "",
                         relationship: "",
                         birthDate: "",
@@ -282,9 +285,8 @@
                             alert(
                                 "Nome existente selecionado. Um novo ID será gerado para este cadastro. Verifique Parentesco e Pai/Mãe.",
                             );
-                            // Não reutiliza o id existente; gera um novo para evitar duplicação
                         }
-                        newPerson.value.id = `${Date.now().toString()}-${Math.floor(Math.random() * 1000)}`; // Sempre novo id
+                        newPerson.value.id = `${Date.now().toString()}-${Math.floor(Math.random() * 1000)}`;
                     };
 
                     const addPerson = async () => {
@@ -295,7 +297,6 @@
                             alert("Nome e parentesco são obrigatórios!");
                             return;
                         }
-                        // Verificar duplicatas por Nome e Parentesco
                         if (
                             tree.value.some(
                                 (p) =>
@@ -309,7 +310,6 @@
                             );
                             return;
                         }
-                        // Alerta sobre Pai/Mãe conflitante
                         if (newPerson.value.parentId) {
                             const parent = tree.value.find(
                                 (p) => p.id === newPerson.value.parentId,

@@ -49,6 +49,21 @@ app.post("/members", async (req, res) => {
         .status(400)
         .json({ message: "Já existe um membro com esse nome e parentesco!" });
     }
+    // Inicializar arrays
+    newMember.parentIds = newMember.parentId
+      ? [String(newMember.parentId)]
+      : [];
+    newMember.childrenIds = [];
+    newMember.siblingsIds = [];
+    newMember.relationships = [];
+
+    // Adicionar o novo membro primeiro
+    newMember.validated = true;
+    const result = await membersCollection.insertOne(newMember);
+    console.log(
+      `Membro ${newMember.id} adicionado com sucesso, relationships: ${newMember.relationships}`,
+    );
+
     // Atualizar relações de parentes existentes
     if (newMember.parentId) {
       const parentIdStr = String(newMember.parentId);
@@ -62,14 +77,62 @@ app.post("/members", async (req, res) => {
           { $push: { childrenIds: newMember.id } },
           { upsert: false },
         );
-        newMember.parentIds = [parentIdStr];
+        // Recalcular relationships do pai após a inserção
+        const updatedParent = await membersCollection.findOne({
+          id: parentIdStr,
+        });
+        console.log(
+          `childrenIds do pai ${parentIdStr} após atualização: ${updatedParent.childrenIds}`,
+        );
+        if (
+          updatedParent &&
+          updatedParent.childrenIds &&
+          updatedParent.childrenIds.length > 0
+        ) {
+          const parentRelationships = [];
+          const children = await membersCollection
+            .find({ id: { $in: updatedParent.childrenIds } })
+            .toArray();
+          console.log(`Filhos encontrados para ${parentIdStr}:`, children);
+          if (children.length > 0) {
+            children.forEach((child) => {
+              // Determinar a relação correta com base no parentesco do filho
+              let relation = "";
+              if (
+                child.relationship === "Filho" ||
+                child.relationship === "Pai"
+              ) {
+                relation = "pai";
+              } else if (
+                child.relationship === "Filha" ||
+                child.relationship === "Mãe"
+              ) {
+                relation = "mãe";
+              } else {
+                relation = updatedParent.relationship.toLowerCase(); // Fallback para outros casos
+              }
+              parentRelationships.push(`${relation} de ${child.name}`);
+            });
+            await membersCollection.updateOne(
+              { id: parentIdStr },
+              { $set: { relationships: parentRelationships } },
+            );
+            console.log(
+              `Relações do pai ${parentIdStr} atualizadas: ${parentRelationships}`,
+            );
+          } else {
+            console.log(
+              `Nenhum filho encontrado para ${parentIdStr} apesar de childrenIds: ${updatedParent.childrenIds}`,
+            );
+          }
+        } else {
+          console.log(`childrenIds vazio ou nulo para ${parentIdStr}`);
+        }
       } else {
         console.log(`Pai com id ${parentIdStr} não encontrado`);
-        newMember.parentIds = [];
       }
-    } else {
-      newMember.parentIds = [];
     }
+
     // Atualizar siblings (irmãos) se houver parentId
     if (newMember.parentIds.length) {
       const siblings = await membersCollection
@@ -83,14 +146,36 @@ app.post("/members", async (req, res) => {
         { id: { $in: newMember.siblingsIds } },
         { $push: { siblingsIds: newMember.id } },
       );
-    } else {
-      newMember.siblingsIds = [];
     }
-    // Adicionar o novo membro
-    newMember.validated = true;
-    newMember.relationships = [];
-    const result = await membersCollection.insertOne(newMember);
-    console.log(`Membro ${newMember.id} adicionado com sucesso`);
+
+    // Calcular relationships do novo membro após inserção
+    const relationships = [];
+    if (newMember.parentIds.length) {
+      const parent = await membersCollection.findOne({
+        id: newMember.parentIds[0],
+      });
+      if (parent) {
+        relationships.push(`Filho de ${parent.name}`);
+      }
+    }
+    if (newMember.childrenIds.length) {
+      const children = await membersCollection
+        .find({ id: { $in: newMember.childrenIds } })
+        .toArray();
+      children.forEach((child) => {
+        relationships.push(
+          `${newMember.relationship.toLowerCase()} de ${child.name}`,
+        );
+      });
+    }
+    await membersCollection.updateOne(
+      { id: newMember.id },
+      { $set: { relationships: relationships } },
+    );
+    console.log(
+      `Relações do novo membro ${newMember.id} atualizadas: ${relationships}`,
+    );
+
     res.status(201).json(newMember);
   } catch (error) {
     console.error("Erro ao adicionar membro:", error);
