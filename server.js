@@ -19,6 +19,7 @@ const personSchema = new mongoose.Schema({
   id: String,
   name: String,
   birthDate: String,
+  gender: String, // Novo campo para gênero
   avatar: String,
   parentIds: [String],
   childrenIds: [String],
