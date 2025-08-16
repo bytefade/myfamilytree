@@ -3,15 +3,20 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>MyFamily - Árvore Genealógica Colaborativa</title>
+        <title>MyFamily - Listagem de Pessoas</title>
         <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47/dist/vue.global.prod.js"></script>
         <script src="https://cdn.tailwindcss.com"></script>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+        />
     </head>
     <body>
         <div id="app" class="min-h-screen bg-gray-100 p-4">
+            <!-- Seção para Adicionar Pessoa -->
             <div class="max-w-md mx-auto bg-white p-6 rounded shadow mb-6">
                 <h1 class="text-2xl font-bold mb-4">
-                    MyFamily - Adicionar Membro
+                    MyFamily - Adicionar Pessoa
                 </h1>
                 <div class="space-y-4">
                     <div>
@@ -22,40 +27,9 @@
                             v-model="newPerson.name"
                             type="text"
                             class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                            placeholder="Digite ou selecione o nome"
-                            list="nameSuggestions"
-                            @input="filterSuggestions"
-                            @change="selectOrAddName"
+                            placeholder="Digite o nome"
                             required
                         />
-                        <datalist id="nameSuggestions">
-                            <option
-                                v-for="suggestion in filteredSuggestions"
-                                :key="suggestion.id"
-                                :value="suggestion.name"
-                            ></option>
-                        </datalist>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700"
-                            >Parentesco Principal</label
-                        >
-                        <select
-                            v-model="newPerson.relationship"
-                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                            required
-                        >
-                            <option value="" disabled>
-                                Selecione o parentesco
-                            </option>
-                            <option
-                                v-for="rel in relationships"
-                                :key="rel"
-                                :value="rel"
-                            >
-                                {{ rel }}
-                            </option>
-                        </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700"
@@ -63,16 +37,6 @@
                         >
                         <input
                             v-model="newPerson.birthDate"
-                            type="date"
-                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                        />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700"
-                            >Data de Falecimento</label
-                        >
-                        <input
-                            v-model="newPerson.deathDate"
                             type="date"
                             class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
                         />
@@ -88,143 +52,247 @@
                             class="mt-1 block w-full"
                         />
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700"
-                            >Pai/Mãe (opcional)</label
-                        >
-                        <select
-                            v-model="newPerson.parentId"
-                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                            :disabled="tree.some(p => p.name === newPerson.name && p.relationship === newPerson.relationship)"
-                        >
-                            <option :value="null">Nenhum</option>
-                            <option
-                                v-for="person in uniqueParents"
-                                :key="person.id"
-                                :value="person.id"
-                            >
-                                {{ person.name }} ({{ person.relationship }})
-                            </option>
-                        </select>
-                    </div>
                     <button
                         @click="addPerson"
                         class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
                     >
-                        Adicionar
+                        Adicionar Pessoa
                     </button>
                 </div>
             </div>
 
+            <!-- Listagem de Pessoas -->
             <div class="max-w-4xl mx-auto">
-                <h2 class="text-xl font-bold mb-4">Árvore Genealógica</h2>
-                <div v-if="tree.length === 0" class="text-gray-500">
-                    Nenhum membro adicionado ainda.
+                <h2 class="text-xl font-bold mb-4">Pessoas</h2>
+                <div v-if="people.length === 0" class="text-gray-500">
+                    Nenhuma pessoa adicionada ainda.
                 </div>
-                <div v-else>
-                    <div v-for="person in rootPeople" :key="person.id">
-                        <tree-node
-                            :person="person"
-                            :tree="tree"
-                            :depth="0"
-                            :expanded-nodes="expandedNodes"
-                            @toggle="toggleNode"
-                        ></tree-node>
+                <div v-else class="space-y-4">
+                    <div
+                        v-for="person in people"
+                        :key="person?.id"
+                        class="bg-white p-4 rounded shadow flex items-center justify-between"
+                    >
+                        <div class="flex items-center space-x-4">
+                            <img
+                                v-if="person.avatar"
+                                :src="person.avatar"
+                                alt="Avatar"
+                                class="w-12 h-12 rounded-full object-cover"
+                            />
+                            <img
+                                v-else
+                                src="https://placehold.co/48x48"
+                                alt="Placeholder"
+                                class="w-12 h-12 rounded-full object-cover"
+                            />
+                            <div>
+                                <p class="font-bold">{{ person.name }}</p>
+                                <p class="text-sm text-gray-600">
+                                    Nasc: {{ formatDate(person.birthDate) }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="space-x-2">
+                            <button
+                                @click="openModal(person)"
+                                class="bg-yellow-500 text-white py-1 px-2 rounded text-sm"
+                            >
+                                Parentesco
+                            </button>
+                            <button
+                                @click="openRelationsModal(person)"
+                                class="bg-purple-500 text-white py-1 px-2 rounded text-sm"
+                            >
+                                {{ person.relationships ?
+                                person.relationships.length : 0 }} relações
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de Parentesco -->
+            <div
+                v-if="isModalOpen"
+                class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center"
+            >
+                <div class="bg-white p-6 rounded shadow-lg w-96">
+                    <h3 class="text-xl font-bold mb-4">Adicionar Parentesco</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center space-x-4">
+                            <img
+                                v-if="selectedPerson.avatar"
+                                :src="selectedPerson.avatar"
+                                alt="Avatar"
+                                class="w-16 h-16 rounded-full object-cover"
+                            />
+                            <img
+                                v-else
+                                src="https://placehold.co/64x64"
+                                alt="Placeholder"
+                                class="w-16 h-16 rounded-full object-cover"
+                            />
+                            <div>
+                                <p class="font-bold">
+                                    {{ selectedPerson.name }}
+                                </p>
+                                <p class="text-sm text-gray-600">
+                                    Nasc: {{
+                                    formatDate(selectedPerson.birthDate) }}
+                                </p>
+                            </div>
+                        </div>
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-700"
+                                >Parentesco</label
+                            >
+                            <select
+                                v-model="relationshipType"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                            >
+                                <option value="" disabled>
+                                    Selecione o parentesco
+                                </option>
+                                <option
+                                    v-for="rel in parentescoOptions"
+                                    :key="rel"
+                                    :value="rel"
+                                >
+                                    {{ rel }}
+                                </option>
+                            </select>
+                        </div>
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-700"
+                                >Relação</label
+                            >
+                            <select
+                                v-model="relatedPersonId"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                            >
+                                <option value="" disabled>
+                                    Selecione a pessoa
+                                </option>
+                                <option
+                                    v-for="person in availablePeople"
+                                    :key="person?.id"
+                                    :value="person.id"
+                                >
+                                    {{ person.name }}
+                                </option>
+                            </select>
+                        </div>
+                        <div class="flex justify-end space-x-2">
+                            <button
+                                @click="closeModal"
+                                class="bg-gray-500 text-white py-1 px-2 rounded"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                @click="saveRelationship"
+                                class="bg-green-500 text-white py-1 px-2 rounded"
+                            >
+                                Salvar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de Relações -->
+            <div
+                v-if="isRelationsModalOpen"
+                class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center"
+            >
+                <div class="bg-white p-6 rounded shadow-lg w-96">
+                    <h3 class="text-xl font-bold mb-4">
+                        Relações de {{ selectedPerson?.name }}
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center space-x-4">
+                            <img
+                                v-if="selectedPerson.avatar"
+                                :src="selectedPerson.avatar"
+                                alt="Avatar"
+                                class="w-16 h-16 rounded-full object-cover"
+                            />
+                            <img
+                                v-else
+                                src="https://placehold.co/64x64"
+                                alt="Placeholder"
+                                class="w-16 h-16 rounded-full object-cover"
+                            />
+                            <div>
+                                <p class="font-bold">
+                                    {{ selectedPerson.name }}
+                                </p>
+                                <p class="text-sm text-gray-600">
+                                    Nasc: {{
+                                    formatDate(selectedPerson.birthDate) }}
+                                </p>
+                            </div>
+                        </div>
+                        <div>
+                            <ul class="list-disc pl-5 space-y-2">
+                                <li
+                                    v-for="(relation, index) in selectedPerson.relationships"
+                                    :key="index"
+                                >
+                                    {{ relation }}
+                                    <span class="ml-2">
+                                        <i
+                                            @click="editRelationship(index)"
+                                            class="fas fa-edit text-blue-500 cursor-pointer hover:text-blue-700"
+                                        ></i>
+                                        <i
+                                            @click="removeRelationship(index)"
+                                            class="fas fa-trash-alt text-red-500 cursor-pointer hover:text-red-700 ml-2"
+                                        ></i>
+                                    </span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="flex justify-end">
+                            <button
+                                @click="closeRelationsModal"
+                                class="bg-gray-500 text-white py-1 px-2 rounded"
+                            >
+                                Fechar
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <script type="text/javascript">
-            const { createApp, ref, computed, onMounted } = Vue;
-
-            const TreeNode = {
-                name: "TreeNode",
-                props: ["person", "tree", "depth", "expanded-nodes"],
-                template: `
-        <div :class="'ml-' + (depth * 4) + ' p-2 border-l-2 border-gray-300'">
-          <div class="flex items-center space-x-2 bg-white p-3 rounded shadow">
-            <button @click="$emit('toggle', person.id)" class="text-blue-500">
-              {{ expandedNodes.has(person.id) ? '▼' : '▶' }}
-            </button>
-            <img v-if="person.avatar" :src="person.avatar" :alt="person.name" class="w-10 h-10 rounded-full object-cover">
-            <div>
-              <p class="font-bold">{{ person.name }}</p>
-              <p class="text-sm text-gray-600">{{ person.relationship }}</p>
-              <p class="text-sm text-gray-600">
-                Nasc: {{ person.birthDate || 'N/A' }}
-                <span v-if="person.deathDate"> | Falec: {{ person.deathDate }}</span>
-              </p>
-              <p class="text-sm">Status: {{ person.validated ? 'Validado' : 'Pendente' }}</p>
-              <p v-if="person.relationships && person.relationships.length" class="text-sm text-gray-700">
-                Relações: {{ person.relationships.join(', ') }}
-              </p>
-            </div>
-          </div>
-          <div v-if="expandedNodes.has(person.id)" class="ml-4">
-            <div v-for="child in getChildren(person.id)" :key="child.id">
-              <p>Filho: {{ child.name }}</p>
-              <tree-node :person="child" :tree="tree" :depth="depth + 1" :expanded-nodes="expandedNodes" @toggle="$emit('toggle', $event)"></tree-node>
-            </div>
-            <div v-if="person.parentIds && person.parentIds.length">
-              <p v-for="parentId in person.parentIds" :key="parentId">
-                Pai/Mãe: {{ getParent(parentId).name }} ({{ getParent(parentId).relationship }})
-              </p>
-            </div>
-            <div v-if="person.siblingsIds && person.siblingsIds.length">
-              <p v-for="siblingId in person.siblingsIds" :key="siblingId">
-                Irmão: {{ getSibling(siblingId).name }} ({{ getSibling(siblingId).relationship }})
-              </p>
-            </div>
-          </div>
-        </div>
-      `,
-                computed: {
-                    getChildren() {
-                        return (parentId) => {
-                            const children = this.tree.filter(
-                                (p) =>
-                                    p.parentIds &&
-                                    p.parentIds.includes(parentId),
-                            );
-                            console.log(
-                                `Children for ${parentId} (depth ${this.depth}):`,
-                                children,
-                            );
-                            return children;
-                        };
-                    },
-                    getParent() {
-                        return (parentId) =>
-                            this.tree.find((p) => p.id === parentId) || {};
-                    },
-                    getSibling() {
-                        return (siblingId) =>
-                            this.tree.find((p) => p.id === siblingId) || {};
-                    },
-                },
-            };
+            const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
             const app = createApp({
-                components: { "tree-node": TreeNode },
                 setup() {
-                    const tree = ref([]);
+                    const people = ref([]);
                     const newPerson = ref({
                         id: `${Date.now().toString()}-${Math.floor(Math.random() * 1000)}`,
                         name: "",
-                        relationship: "",
                         birthDate: "",
-                        deathDate: "",
                         avatar: "",
                         parentIds: [],
                         childrenIds: [],
                         siblingsIds: [],
-                        validated: true,
+                        validated: false,
                         relationships: [],
                     });
-                    const expandedNodes = ref(new Set());
-                    const filteredSuggestions = ref([]);
-                    const relationships = [
+                    const isModalOpen = ref(false);
+                    const isRelationsModalOpen = ref(false);
+                    const selectedPerson = ref(null);
+                    const relationshipType = ref("");
+                    const relatedPersonId = ref("");
+                    const editIndex = ref(null); // Novo: rastreia o índice da relação sendo editada
+                    const parentescoOptions = [
                         "Pai",
                         "Mãe",
                         "Filho",
@@ -233,103 +301,16 @@
                         "Avó",
                         "Neto",
                         "Neta",
-                        "Irmão",
-                        "Irmã",
-                        "Tio",
-                        "Tia",
-                        "Sobrinho",
-                        "Sobrinha",
-                        "Primo",
-                        "Prima",
-                        "Bisavô",
-                        "Bisavó",
-                        "Bisneto",
-                        "Bisneta",
-                        "Sogro",
-                        "Sogra",
-                        "Genro",
-                        "Nora",
-                        "Cunhado",
-                        "Cunhada",
-                        "Padrasto",
-                        "Madrasta",
-                        "Enteado",
-                        "Enteada",
                     ];
 
-                    const rootPeople = computed(() =>
-                        tree.value.filter((person) => !person.parentIds.length),
-                    );
-                    const uniqueParents = computed(() => {
-                        const seen = new Set();
-                        return tree.value.filter(
-                            (p) =>
-                                p.validated &&
-                                !seen.has(p.id) &&
-                                seen.add(p.id),
-                        );
-                    });
-
-                    const filterSuggestions = () => {
-                        const input = newPerson.value.name.toLowerCase();
-                        filteredSuggestions.value = tree.value
-                            .filter((p) => p.name.toLowerCase().includes(input))
-                            .map((p) => ({ id: p.id, name: p.name }));
-                    };
-
-                    const selectOrAddName = () => {
-                        const existing = tree.value.find(
-                            (p) => p.name === newPerson.value.name,
-                        );
-                        if (existing) {
-                            alert(
-                                "Nome existente selecionado. Um novo ID será gerado para este cadastro. Verifique Parentesco e Pai/Mãe.",
-                            );
-                        }
-                        newPerson.value.id = `${Date.now().toString()}-${Math.floor(Math.random() * 1000)}`;
-                    };
-
                     const addPerson = async () => {
-                        if (
-                            !newPerson.value.name ||
-                            !newPerson.value.relationship
-                        ) {
-                            alert("Nome e parentesco são obrigatórios!");
+                        if (!newPerson.value.name) {
+                            alert("Nome é obrigatório!");
                             return;
-                        }
-                        if (
-                            tree.value.some(
-                                (p) =>
-                                    p.name === newPerson.value.name &&
-                                    p.relationship ===
-                                        newPerson.value.relationship,
-                            )
-                        ) {
-                            alert(
-                                "Já existe um membro com esse nome e parentesco! Ajuste o Pai/Mãe ou escolha outro parentesco.",
-                            );
-                            return;
-                        }
-                        if (newPerson.value.parentId) {
-                            const parent = tree.value.find(
-                                (p) => p.id === newPerson.value.parentId,
-                            );
-                            if (
-                                parent &&
-                                tree.value.some(
-                                    (p) =>
-                                        p.name === newPerson.value.name &&
-                                        p.parentId === newPerson.value.parentId,
-                                )
-                            ) {
-                                alert(
-                                    "Atenção: Já existe um membro com esse nome e mesmo Pai/Mãe. Confirme os dados.",
-                                );
-                            }
                         }
                         try {
                             const response = await fetch(
-                                "http://localhost:3000/members",
+                                "http://localhost:3000/people",
                                 {
                                     method: "POST",
                                     headers: {
@@ -342,27 +323,27 @@
                                 const error = await response.json();
                                 alert(
                                     error.message ||
-                                        "Erro ao adicionar membro!",
+                                        "Erro ao adicionar pessoa!",
                                 );
                                 return;
                             }
+                            const addedPerson = await response.json();
                             newPerson.value = {
                                 id: `${Date.now().toString()}-${Math.floor(Math.random() * 1000)}`,
                                 name: "",
-                                relationship: "",
                                 birthDate: "",
-                                deathDate: "",
                                 avatar: "",
                                 parentIds: [],
                                 childrenIds: [],
                                 siblingsIds: [],
-                                validated: true,
+                                validated: false,
                                 relationships: [],
                             };
-                            await fetchTree();
+                            await fetchPeople();
+                            await nextTick();
                         } catch (error) {
                             alert("Erro ao conectar ao servidor!");
-                            console.error(error);
+                            console.error("Erro no addPerson:", error);
                         }
                     };
 
@@ -377,28 +358,172 @@
                         }
                     };
 
-                    const toggleNode = (id) => {
-                        const newSet = new Set(expandedNodes.value);
-                        if (newSet.has(id)) {
-                            newSet.delete(id);
-                        } else {
-                            newSet.add(id);
-                        }
-                        console.log("Expanded nodes:", Array.from(newSet));
-                        expandedNodes.value = newSet;
+                    const openModal = (person) => {
+                        selectedPerson.value = {
+                            ...people.value.find((p) => p.id === person.id),
+                        };
+                        relationshipType.value = "";
+                        relatedPersonId.value = "";
+                        editIndex.value = null; // Reseta o índice ao abrir um novo modal
+                        isModalOpen.value = true;
                     };
 
-                    const fetchTree = async () => {
+                    const closeModal = () => {
+                        isModalOpen.value = false;
+                    };
+
+                    const saveRelationship = async () => {
+                        if (
+                            !selectedPerson.value ||
+                            !relationshipType.value ||
+                            !relatedPersonId.value
+                        ) {
+                            alert("Preencha todos os campos!");
+                            return;
+                        }
+                        const personToUpdate = people.value.find(
+                            (p) => p.id === selectedPerson.value.id,
+                        );
+                        if (personToUpdate) {
+                            const relatedPerson = people.value.find(
+                                (p) => p.id === relatedPersonId.value,
+                            );
+                            if (relatedPerson) {
+                                const newRelationship = `${relationshipType.value} de ${relatedPerson.name}`;
+                                personToUpdate.relationships =
+                                    personToUpdate.relationships || [];
+                                if (
+                                    editIndex.value !== null &&
+                                    editIndex.value >= 0 &&
+                                    editIndex.value <
+                                        personToUpdate.relationships.length
+                                ) {
+                                    personToUpdate.relationships[
+                                        editIndex.value
+                                    ] = newRelationship; // Substitui a relação existente
+                                } else {
+                                    personToUpdate.relationships.push(
+                                        newRelationship,
+                                    ); // Adiciona nova relação
+                                }
+                                try {
+                                    await fetch(
+                                        `http://localhost:3000/people/${personToUpdate.id}`,
+                                        {
+                                            method: "PATCH",
+                                            headers: {
+                                                "Content-Type":
+                                                    "application/json",
+                                            },
+                                            body: JSON.stringify({
+                                                relationships:
+                                                    personToUpdate.relationships,
+                                            }),
+                                        },
+                                    );
+                                    await fetchPeople();
+                                    closeModal();
+                                } catch (error) {
+                                    alert("Erro ao salvar relação!");
+                                    console.error(
+                                        "Erro no saveRelationship:",
+                                        error,
+                                    );
+                                }
+                            }
+                        }
+                    };
+
+                    const openRelationsModal = (person) => {
+                        selectedPerson.value = {
+                            ...people.value.find((p) => p.id === person.id),
+                        };
+                        isRelationsModalOpen.value = true;
+                    };
+
+                    const closeRelationsModal = () => {
+                        isRelationsModalOpen.value = false;
+                    };
+
+                    const removeRelationship = async (index) => {
+                        const personToUpdate = people.value.find(
+                            (p) => p.id === selectedPerson.value.id,
+                        );
+                        if (personToUpdate && personToUpdate.relationships) {
+                            personToUpdate.relationships.splice(index, 1);
+                            selectedPerson.value.relationships = [
+                                ...personToUpdate.relationships,
+                            ];
+                            try {
+                                await fetch(
+                                    `http://localhost:3000/people/${personToUpdate.id}`,
+                                    {
+                                        method: "PATCH",
+                                        headers: {
+                                            "Content-Type": "application/json",
+                                        },
+                                        body: JSON.stringify({
+                                            relationships:
+                                                personToUpdate.relationships,
+                                        }),
+                                    },
+                                );
+                                await fetchPeople();
+                            } catch (error) {
+                                alert("Erro ao remover relação!");
+                                console.error(
+                                    "Erro no removeRelationship:",
+                                    error,
+                                );
+                            }
+                        }
+                    };
+
+                    const editRelationship = (index) => {
+                        const relation =
+                            selectedPerson.value.relationships[index];
+                        const [parentesco, name] = relation.split(" de ");
+                        const relatedPerson = people.value.find(
+                            (p) => p.name === name,
+                        );
+                        if (relatedPerson) {
+                            selectedPerson.value = {
+                                ...people.value.find(
+                                    (p) => p.id === selectedPerson.value.id,
+                                ),
+                            };
+                            relationshipType.value = parentesco;
+                            relatedPersonId.value = relatedPerson.id;
+                            editIndex.value = index; // Armazena o índice da relação a ser editada
+                            closeRelationsModal();
+                            isModalOpen.value = true;
+                        }
+                    };
+
+                    const availablePeople = computed(() => {
+                        return people.value.filter(
+                            (p) => p.id !== selectedPerson.value?.id,
+                        );
+                    });
+
+                    const formatDate = (date) => {
+                        if (!date) return "N/A";
+                        const d = new Date(date);
+                        const day = String(d.getDate()).padStart(2, "0");
+                        const month = String(d.getMonth() + 1).padStart(2, "0");
+                        const year = d.getFullYear();
+                        return `${day}/${month}/${year}`;
+                    };
+
+                    const fetchPeople = async () => {
                         try {
                             const response = await fetch(
-                                "http://localhost:3000/members",
+                                "http://localhost:3000/people",
                             );
                             if (response.ok) {
                                 const data = await response.json();
-                                console.log("Fetched tree:", data);
-                                tree.value = data;
-                            } else {
-                                alert("Erro ao carregar a árvore!");
+                                people.value = data;
+                                await nextTick();
                             }
                         } catch (error) {
                             alert("Erro ao conectar ao servidor!");
@@ -407,23 +532,31 @@
                     };
 
                     onMounted(() => {
-                        fetchTree();
+                        fetchPeople();
                     });
 
                     return {
-                        tree,
+                        people,
                         newPerson,
-                        expandedNodes,
-                        relationships,
-                        rootPeople,
-                        uniqueParents,
-                        filteredSuggestions,
-                        filterSuggestions,
-                        selectOrAddName,
                         addPerson,
                         handleAvatarUpload,
-                        toggleNode,
-                        fetchTree,
+                        isModalOpen,
+                        isRelationsModalOpen,
+                        selectedPerson,
+                        relationshipType,
+                        relatedPersonId,
+                        editIndex,
+                        parentescoOptions,
+                        availablePeople,
+                        openModal,
+                        closeModal,
+                        saveRelationship,
+                        openRelationsModal,
+                        closeRelationsModal,
+                        removeRelationship,
+                        editRelationship,
+                        formatDate,
+                        fetchPeople,
                     };
                 },
             });
