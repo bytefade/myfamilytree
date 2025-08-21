@@ -52,9 +52,13 @@
                             <option value="" disabled>
                                 Selecione o gênero
                             </option>
-                            <option value="Masculino">Masculino</option>
-                            <option value="Feminino">Feminino</option>
-                            <option value="Outro">Outro</option>
+                            <option
+                                v-for="genero in generoOptions"
+                                :key="genero"
+                                :value="genero"
+                            >
+                                {{ genero }}
+                            </option>
                         </select>
                     </div>
                     <div>
@@ -85,7 +89,7 @@
                 </div>
                 <div v-else class="space-y-4">
                     <div
-                        v-for="person in people"
+                        v-for="person in sortedPeople"
                         :key="person?.id"
                         class="bg-white p-4 rounded shadow flex items-center justify-between"
                     >
@@ -176,7 +180,7 @@
                                     Selecione o parentesco
                                 </option>
                                 <option
-                                    v-for="rel in parentescoOptions"
+                                    v-for="rel in sortedParentescoOptions"
                                     :key="rel"
                                     :value="rel"
                                 >
@@ -197,7 +201,7 @@
                                     Selecione a pessoa
                                 </option>
                                 <option
-                                    v-for="person in availablePeople"
+                                    v-for="person in sortedAvailablePeople"
                                     :key="person?.id"
                                     :value="person.id"
                                 >
@@ -259,20 +263,38 @@
                                 </p>
                             </div>
                         </div>
-                        <div>
-                            <ul class="list-disc pl-5 space-y-2">
+                        <div class="tabs flex space-x-2">
+                            <button
+                                v-for="tab in tabs"
+                                :key="tab"
+                                v-if="shouldShowTab(tab)"
+                                @click="currentTab = tab"
+                                :class="{'bg-blue-500 text-white': currentTab === tab, 'bg-gray-200': currentTab !== tab}"
+                                class="py-2 px-4 rounded-t-lg"
+                            >
+                                {{ tab }}
+                            </button>
+                        </div>
+                        <div class="tab-content">
+                            <div
+                                v-if="filteredRelations.length === 0"
+                                class="text-gray-500"
+                            >
+                                Nenhuma relação nesta categoria.
+                            </div>
+                            <ul class="list-disc pl-5 space-y-2" v-else>
                                 <li
-                                    v-for="(relation, index) in selectedPerson.relationships"
+                                    v-for="(relation, index) in filteredRelations"
                                     :key="index"
                                 >
                                     {{ relation }}
                                     <span class="ml-2">
                                         <i
-                                            @click="editRelationship(index)"
+                                            @click="editRelationship(relation)"
                                             class="fas fa-edit text-blue-500 cursor-pointer hover:text-blue-700"
                                         ></i>
                                         <i
-                                            @click="removeRelationship(index)"
+                                            @click="removeRelationship(relation)"
                                             class="fas fa-trash-alt text-red-500 cursor-pointer hover:text-red-700 ml-2"
                                         ></i>
                                     </span>
@@ -298,6 +320,8 @@
             const app = createApp({
                 setup() {
                     const people = ref([]);
+                    const parentescos = ref([]);
+                    const generos = ref([]);
                     const newPerson = ref({
                         id: `${Date.now().toString()}-${Math.floor(Math.random() * 1000)}`,
                         name: "",
@@ -316,16 +340,81 @@
                     const relationshipType = ref("");
                     const relatedPersonId = ref("");
                     const editIndex = ref(null);
-                    const parentescoOptions = [
-                        "Pai",
-                        "Mãe",
-                        "Filho",
-                        "Filha",
-                        "Avô",
-                        "Avó",
-                        "Neto",
-                        "Neta",
-                    ];
+                    const parentescoOptions = ref([]);
+                    const generoOptions = ref([]);
+                    const currentTab = ref(null);
+                    const tabs = ["Mãe", "Avó", "Outros"];
+
+                    // Função genérica para ordenar arrays ASC
+                    const sortAlphabetically = (arr, key = null) => {
+                        return [...arr].sort((a, b) => {
+                            const valA = key ? a[key] || "" : a;
+                            const valB = key ? b[key] || "" : b;
+                            return valA.localeCompare(valB);
+                        });
+                    };
+
+                    // Ordenação ASC para lista de pessoas
+                    const sortedPeople = computed(() => {
+                        return sortAlphabetically(people.value, "name");
+                    });
+
+                    // Ordenação ASC para lista de parentescos
+                    const sortedParentescoOptions = computed(() => {
+                        return sortAlphabetically(parentescoOptions.value);
+                    });
+
+                    // Ordenação ASC para lista de pessoas disponíveis no select de relação
+                    const sortedAvailablePeople = computed(() => {
+                        return sortAlphabetically(
+                            availablePeople.value,
+                            "name",
+                        );
+                    });
+
+                    // Ordenação ASC para lista de relações no modal de relações
+                    const sortedRelationships = computed(() => {
+                        return sortAlphabetically(
+                            selectedPerson.value?.relationships || [],
+                        );
+                    });
+
+                    // Filtro de relações por aba
+                    const filteredRelations = computed(() => {
+                        if (!currentTab.value) return [];
+                        return sortedRelationships.value.filter((relation) => {
+                            if (currentTab.value === "Mãe")
+                                return relation.startsWith("Mãe de");
+                            if (currentTab.value === "Avó")
+                                return relation.startsWith("Avó de");
+                            if (currentTab.value === "Outros")
+                                return (
+                                    !relation.startsWith("Mãe de") &&
+                                    !relation.startsWith("Avó de")
+                                );
+                            return false;
+                        });
+                    });
+
+                    // Verificar se uma aba deve ser exibida
+                    const shouldShowTab = (tab) => {
+                        const gender =
+                            selectedPerson.value?.gender || "Nãoespecificado";
+                        if (tab === "Mãe" && gender !== "Feminino")
+                            return false;
+                        if (tab === "Avó" && gender !== "Feminino")
+                            return false;
+                        if (tab === "Outros") {
+                            return sortedRelationships.value.some(
+                                (relation) =>
+                                    !relation.startsWith("Mãe de") &&
+                                    !relation.startsWith("Avó de"),
+                            );
+                        }
+                        return sortedRelationships.value.some((relation) =>
+                            relation.startsWith(tab + " de"),
+                        );
+                    };
 
                     const addPerson = async () => {
                         if (!newPerson.value.name || !newPerson.value.gender) {
@@ -351,7 +440,6 @@
                                 );
                                 return;
                             }
-                            const addedPerson = await response.json();
                             newPerson.value = {
                                 id: `${Date.now().toString()}-${Math.floor(Math.random() * 1000)}`,
                                 name: "",
@@ -412,52 +500,67 @@
                         const relatedPerson = people.value.find(
                             (p) => p.id === relatedPersonId.value,
                         );
-                        if (personToUpdate && relatedPerson) {
-                            const newRelationship = `${relationshipType.value} de ${relatedPerson.name}`;
-                            personToUpdate.relationships =
-                                personToUpdate.relationships || [];
-                            if (
-                                personToUpdate.relationships.includes(
-                                    newRelationship,
-                                )
-                            ) {
-                                alert(
-                                    "Essa combinação de parentesco e pessoa já existe!",
-                                );
-                                return;
-                            }
-                            if (
-                                editIndex.value !== null &&
-                                editIndex.value >= 0 &&
-                                editIndex.value <
-                                    personToUpdate.relationships.length
-                            ) {
-                                personToUpdate.relationships[editIndex.value] =
-                                    newRelationship;
-                            } else {
-                                personToUpdate.relationships.push(
-                                    newRelationship,
-                                );
-                            }
-
-                            // Auto-relation: Adicionar relação inversa com base no gênero
-                            const inverseRelationship = getInverseRelationship(
-                                relationshipType.value,
-                                personToUpdate.name,
-                                relatedPerson,
-                                relatedPerson.gender,
+                        if (!personToUpdate || !relatedPerson) {
+                            alert("Pessoa ou relação inválida!");
+                            return;
+                        }
+                        const newRelationship = `${relationshipType.value} de ${relatedPerson.name}`;
+                        personToUpdate.relationships =
+                            personToUpdate.relationships || [];
+                        if (
+                            personToUpdate.relationships.includes(
+                                newRelationship,
+                            )
+                        ) {
+                            alert(
+                                "Essa combinação de parentesco e pessoa já existe!",
                             );
-                            if (
-                                inverseRelationship &&
-                                !relatedPerson.relationships.includes(
-                                    inverseRelationship,
-                                )
-                            ) {
-                                relatedPerson.relationships =
-                                    relatedPerson.relationships || [];
-                                relatedPerson.relationships.push(
-                                    inverseRelationship,
-                                );
+                            return;
+                        }
+                        if (
+                            editIndex.value !== null &&
+                            editIndex.value >= 0 &&
+                            editIndex.value <
+                                personToUpdate.relationships.length
+                        ) {
+                            personToUpdate.relationships[editIndex.value] =
+                                newRelationship;
+                        } else {
+                            personToUpdate.relationships.push(newRelationship);
+                        }
+
+                        // Auto-relation: Adicionar relação inversa com base no gênero
+                        const inverseRelationship = getInverseRelationship(
+                            relationshipType.value,
+                            personToUpdate,
+                            relatedPerson,
+                        );
+                        console.log(
+                            "grandparentGender:",
+                            personToUpdate.gender === "Feminino"
+                                ? "Avó"
+                                : "Avô",
+                        );
+                        console.log(
+                            "New:",
+                            newRelationship,
+                            "Inverse:",
+                            inverseRelationship,
+                            "Gender:",
+                            personToUpdate.gender,
+                        );
+                        if (
+                            inverseRelationship &&
+                            !relatedPerson.relationships.includes(
+                                inverseRelationship,
+                            )
+                        ) {
+                            relatedPerson.relationships =
+                                relatedPerson.relationships || [];
+                            relatedPerson.relationships.push(
+                                inverseRelationship,
+                            );
+                            try {
                                 await fetch(
                                     `http://localhost:3000/people/${relatedPerson.id}`,
                                     {
@@ -471,68 +574,77 @@
                                         }),
                                     },
                                 );
-                            }
-
-                            try {
-                                await fetch(
-                                    `http://localhost:3000/people/${personToUpdate.id}`,
-                                    {
-                                        method: "PATCH",
-                                        headers: {
-                                            "Content-Type": "application/json",
-                                        },
-                                        body: JSON.stringify({
-                                            relationships:
-                                                personToUpdate.relationships,
-                                        }),
-                                    },
-                                );
-                                await fetchPeople();
-                                closeModal();
                             } catch (error) {
-                                alert("Erro ao salvar relação!");
                                 console.error(
-                                    "Erro no saveRelationship:",
+                                    "Erro ao atualizar relação inversa:",
                                     error,
                                 );
                             }
+                        }
+
+                        try {
+                            await fetch(
+                                `http://localhost:3000/people/${personToUpdate.id}`,
+                                {
+                                    method: "PATCH",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({
+                                        relationships:
+                                            personToUpdate.relationships,
+                                    }),
+                                },
+                            );
+                            await fetchPeople();
+                            closeModal();
+                        } catch (error) {
+                            alert("Erro ao salvar relação!");
+                            console.error("Erro no saveRelationship:", error);
                         }
                     };
 
                     const getInverseRelationship = (
                         type,
-                        name,
+                        personToUpdate,
                         relatedPerson,
-                        gender,
                     ) => {
                         const genderMap = {
-                            Masculino: "Filho",
-                            Feminino: "Filha",
-                            Outro: "Filho",
+                            Masculino: {
+                                child: "Filho",
+                                parent: "Pai",
+                                grandparent: "Avô",
+                            },
+                            Feminino: {
+                                child: "Filha",
+                                parent: "Mãe",
+                                grandparent: "Avó",
+                            },
+                            Nãoespecificado: {
+                                child: "Filho",
+                                parent: "Pai",
+                                grandparent: "Avô",
+                            },
                         };
-                        const inverseGenderMap = {
-                            Masculino: "Pai",
-                            Feminino: "Mãe",
-                            Outro: "Pai",
-                        };
-                        const genderRelated = relatedPerson.gender
-                            ? genderMap[relatedPerson.gender]
-                            : "Filho";
-                        const genderUpdater = gender
-                            ? inverseGenderMap[gender]
-                            : "Pai";
+
+                        const personGender =
+                            personToUpdate.gender || "Nãoespecificado";
+                        const relatedGender =
+                            relatedPerson.gender || "Nãoespecificado";
+
                         const inverseMap = {
-                            Pai: `${genderRelated} de`,
-                            Mãe: `${genderRelated} de`,
-                            Filho: `${genderUpdater} de`,
-                            Filha: `${genderUpdater} de`,
-                            Avô: `Neta de`,
-                            Avó: `Neta de`,
-                            Neto: `Avô de`,
-                            Neta: `Avô de`,
+                            Pai: `${genderMap[relatedGender].child} de`,
+                            Mãe: `${genderMap[relatedGender].child} de`,
+                            Filho: `${genderMap[personGender].parent} de`,
+                            Filha: `${genderMap[personGender].parent} de`,
+                            Avô: `${genderMap[relatedGender].child === "Filho" ? "Neto" : "Neta"} de`,
+                            Avó: `${genderMap[relatedGender].child === "Filho" ? "Neto" : "Neta"} de`,
+                            Neto: `${genderMap[personGender].grandparent} de`,
+                            Neta: `${genderMap[personGender].grandparent} de`,
                         };
+
                         return inverseMap[type]
-                            ? `${inverseMap[type]} ${name}`
+                            ? `${inverseMap[type]} ${personToUpdate.name}`
                             : null;
                     };
 
@@ -540,25 +652,43 @@
                         selectedPerson.value = {
                             ...people.value.find((p) => p.id === person.id),
                         };
+                        // Definir a aba inicial com prioridade para "Mãe" se houver relações "Mãe de ..."
+                        if (shouldShowTab("Mãe")) {
+                            currentTab.value = "Mãe";
+                        } else if (shouldShowTab("Avó")) {
+                            currentTab.value = "Avó";
+                        } else if (shouldShowTab("Outros")) {
+                            currentTab.value = "Outros";
+                        }
                         isRelationsModalOpen.value = true;
                     };
 
                     const closeRelationsModal = () => {
                         isRelationsModalOpen.value = false;
+                        currentTab.value = null;
                     };
 
-                    const removeRelationship = async (index) => {
+                    const removeRelationship = async (relation) => {
+                        if (!relation) return;
+                        const originalIndex =
+                            selectedPerson.value.relationships.findIndex(
+                                (r) => r === relation,
+                            );
+                        if (originalIndex === -1) return;
                         const personToUpdate = people.value.find(
                             (p) => p.id === selectedPerson.value.id,
                         );
                         if (personToUpdate && personToUpdate.relationships) {
                             const removedRelation =
-                                personToUpdate.relationships[index];
+                                personToUpdate.relationships[originalIndex];
                             const [type, name] = removedRelation.split(" de ");
                             const relatedPerson = people.value.find(
                                 (p) => p.name === name,
                             );
-                            personToUpdate.relationships.splice(index, 1);
+                            personToUpdate.relationships.splice(
+                                originalIndex,
+                                1,
+                            );
                             selectedPerson.value.relationships = [
                                 ...personToUpdate.relationships,
                             ];
@@ -576,20 +706,27 @@
                                         relatedPerson.relationships.filter(
                                             (r) => r !== inverseRelation,
                                         );
-                                    await fetch(
-                                        `http://localhost:3000/people/${relatedPerson.id}`,
-                                        {
-                                            method: "PATCH",
-                                            headers: {
-                                                "Content-Type":
-                                                    "application/json",
+                                    try {
+                                        await fetch(
+                                            `http://localhost:3000/people/${relatedPerson.id}`,
+                                            {
+                                                method: "PATCH",
+                                                headers: {
+                                                    "Content-Type":
+                                                        "application/json",
+                                                },
+                                                body: JSON.stringify({
+                                                    relationships:
+                                                        relatedPerson.relationships,
+                                                }),
                                             },
-                                            body: JSON.stringify({
-                                                relationships:
-                                                    relatedPerson.relationships,
-                                            }),
-                                        },
-                                    );
+                                        );
+                                    } catch (error) {
+                                        console.error(
+                                            "Erro ao remover relação inversa:",
+                                            error,
+                                        );
+                                    }
                                 }
                             }
 
@@ -624,17 +761,21 @@
                             Mãe: "Filho de",
                             Filho: "Pai de",
                             Filha: "Pai de",
-                            Avô: "Neta de",
-                            Avó: "Neta de",
+                            Avô: "Neto de",
+                            Avó: "Neto de",
                             Neto: "Avô de",
                             Neta: "Avô de",
                         };
                         return inverseMap[type] || type;
                     };
 
-                    const editRelationship = (index) => {
-                        const relation =
-                            selectedPerson.value.relationships[index];
+                    const editRelationship = (relation) => {
+                        if (!relation) return;
+                        const originalIndex =
+                            selectedPerson.value.relationships.findIndex(
+                                (r) => r === relation,
+                            );
+                        if (originalIndex === -1) return;
                         const [parentesco, name] = relation.split(" de ");
                         const relatedPerson = people.value.find(
                             (p) => p.name === name,
@@ -647,7 +788,7 @@
                             };
                             relationshipType.value = parentesco;
                             relatedPersonId.value = relatedPerson.id;
-                            editIndex.value = index;
+                            editIndex.value = originalIndex;
                             closeRelationsModal();
                             isModalOpen.value = true;
                         }
@@ -677,19 +818,63 @@
                                 const data = await response.json();
                                 people.value = data;
                                 await nextTick();
+                            } else {
+                                throw new Error("Erro ao carregar pessoas");
                             }
                         } catch (error) {
                             alert("Erro ao conectar ao servidor!");
-                            console.error(error);
+                            console.error("Erro no fetchPeople:", error);
                         }
                     };
 
-                    onMounted(() => {
-                        fetchPeople();
+                    const fetchParentescos = async () => {
+                        try {
+                            const response = await fetch(
+                                "http://localhost:3000/parentescos",
+                            );
+                            if (response.ok) {
+                                const data = await response.json();
+                                parentescoOptions.value = data;
+                            } else {
+                                throw new Error("Erro ao carregar parentescos");
+                            }
+                        } catch (error) {
+                            console.error(
+                                "Erro ao carregar parentescos:",
+                                error,
+                            );
+                            alert("Erro ao carregar parentescos!");
+                        }
+                    };
+
+                    const fetchGeneros = async () => {
+                        try {
+                            const response = await fetch(
+                                "http://localhost:3000/generos",
+                            );
+                            if (response.ok) {
+                                const data = await response.json();
+                                generoOptions.value = data;
+                            } else {
+                                throw new Error("Erro ao carregar gêneros");
+                            }
+                        } catch (error) {
+                            console.error("Erro ao carregar gêneros:", error);
+                            alert("Erro ao carregar gêneros!");
+                        }
+                    };
+
+                    onMounted(async () => {
+                        await Promise.all([
+                            fetchPeople(),
+                            fetchParentescos(),
+                            fetchGeneros(),
+                        ]);
                     });
 
                     return {
                         people,
+                        sortedPeople,
                         newPerson,
                         addPerson,
                         handleAvatarUpload,
@@ -700,6 +885,11 @@
                         relatedPersonId,
                         editIndex,
                         parentescoOptions,
+                        sortedParentescoOptions,
+                        generoOptions,
+                        sortedAvailablePeople,
+                        sortedRelationships,
+                        filteredRelations,
                         availablePeople,
                         openModal,
                         closeModal,
@@ -710,6 +900,9 @@
                         editRelationship,
                         formatDate,
                         fetchPeople,
+                        currentTab,
+                        tabs,
+                        shouldShowTab,
                     };
                 },
             });
