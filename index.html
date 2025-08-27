@@ -372,6 +372,7 @@
                     const generoOptions = ref([]);
                     const currentTab = ref(null);
                     const tabs = ref([
+                        "Avós",
                         "Pais",
                         "Pai",
                         "Avô",
@@ -408,6 +409,10 @@
                     const filteredRelations = computed(() => {
                         if (!currentTab.value) return [];
                         return sortedRelationships.value.filter((relation) => {
+                            if (currentTab.value === "Avós")
+                                return ["Neto de", "Neta de"].some((p) =>
+                                    relation.startsWith(p),
+                                );
                             if (currentTab.value === "Pais")
                                 return ["Filho de", "Filha de"].some((p) =>
                                     relation.startsWith(p),
@@ -430,6 +435,8 @@
                                 );
                             if (currentTab.value === "Outros")
                                 return ![
+                                    "Neto de",
+                                    "Neta de",
                                     "Filho de",
                                     "Filha de",
                                     "Pai de",
@@ -458,6 +465,7 @@
 
                         if (gender === "Masculino") {
                             prioritizedTabs = [
+                                "Avós",
                                 "Pais",
                                 "Pai",
                                 "Avô",
@@ -465,6 +473,10 @@
                                 "Sobrinhos",
                                 "Outros",
                             ].filter((tab) => {
+                                if (tab === "Avós")
+                                    return ["Neto de", "Neta de"].some((p) =>
+                                        rels.some((r) => r.startsWith(p)),
+                                    );
                                 if (tab === "Pais")
                                     return ["Filho de", "Filha de"].some((p) =>
                                         rels.some((r) => r.startsWith(p)),
@@ -489,6 +501,8 @@
                                     return rels.some(
                                         (r) =>
                                             ![
+                                                "Neto de",
+                                                "Neta de",
                                                 "Filho de",
                                                 "Filha de",
                                                 "Pai de",
@@ -503,6 +517,7 @@
                             });
                         } else if (gender === "Feminino") {
                             prioritizedTabs = [
+                                "Avós",
                                 "Pais",
                                 "Mãe",
                                 "Avó",
@@ -510,6 +525,10 @@
                                 "Sobrinhos",
                                 "Outros",
                             ].filter((tab) => {
+                                if (tab === "Avós")
+                                    return ["Neto de", "Neta de"].some((p) =>
+                                        rels.some((r) => r.startsWith(p)),
+                                    );
                                 if (tab === "Pais")
                                     return ["Filho de", "Filha de"].some((p) =>
                                         rels.some((r) => r.startsWith(p)),
@@ -534,6 +553,8 @@
                                     return rels.some(
                                         (r) =>
                                             ![
+                                                "Neto de",
+                                                "Neta de",
                                                 "Filho de",
                                                 "Filha de",
                                                 "Mãe de",
