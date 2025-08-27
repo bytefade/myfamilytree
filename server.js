@@ -6,14 +6,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Substitua pela sua string de conexão do MongoDB
+// String de conexão do MongoDB
 const mongoURI =
   "mongodb+srv://familyuser:a5yeQstKrSpvoguh@cluster0.dwmk1z0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
 mongoose
   .connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => {
     console.log("Conectado ao MongoDB");
-    initializeData(); // Inicializa os dados de parentesco e gênero
+    initializeData();
   })
   .catch((err) => console.error("Erro ao conectar ao MongoDB:", err));
 
@@ -30,8 +30,6 @@ const personSchema = new mongoose.Schema({
   validated: Boolean,
   relationships: [String],
 });
-personSchema.index({ id: 1 });
-personSchema.index({ name: 1 });
 const Person = mongoose.model("Person", personSchema);
 
 // Schema para Parentesco
@@ -46,7 +44,7 @@ const generoSchema = new mongoose.Schema({
 });
 const Genero = mongoose.model("Genero", generoSchema);
 
-// Inicializar dados de parentesco e gênero (executa uma vez ao conectar)
+// Inicializar dados de parentesco e gênero
 async function initializeData() {
   try {
     const parentescos = [
@@ -58,6 +56,12 @@ async function initializeData() {
       "Avó",
       "Neto",
       "Neta",
+      "Irmão",
+      "Irmã",
+      "Tio",
+      "Tia",
+      "Primo",
+      "Prima",
     ];
     const generos = ["Masculino", "Feminino"];
 
@@ -126,7 +130,7 @@ app.patch("/people/:id", async (req, res) => {
       return res.status(404).json({ message: "Pessoa não encontrada" });
     res.json(person);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(500).json({ message: err.message });
   }
 });
 

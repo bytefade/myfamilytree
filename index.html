@@ -263,11 +263,13 @@
                                 </p>
                             </div>
                         </div>
-                        <div class="tabs flex space-x-2">
+                        <div
+                            v-if="selectedPerson && ['Masculino', 'Feminino'].includes(selectedPerson.gender)"
+                            class="tabs flex space-x-2"
+                        >
                             <button
-                                v-for="tab in tabs"
-                                :key="tab"
-                                v-if="shouldShowTab(tab)"
+                                v-for="(tab, index) in visibleTabs"
+                                :key="`${tab}-${index}`"
                                 @click="currentTab = tab"
                                 :class="{'bg-blue-500 text-white': currentTab === tab, 'bg-gray-200': currentTab !== tab}"
                                 class="py-2 px-4 rounded-t-lg"
@@ -277,12 +279,37 @@
                         </div>
                         <div class="tab-content">
                             <div
-                                v-if="filteredRelations.length === 0"
+                                v-if="selectedPerson && !['Masculino', 'Feminino'].includes(selectedPerson.gender) && sortedRelationships.value.length > 0"
+                                class="space-y-2"
+                            >
+                                <p
+                                    v-for="(relation, index) in sortedRelationships.value"
+                                    :key="index"
+                                    class="pl-5"
+                                >
+                                    {{ relation }}
+                                    <span class="ml-2">
+                                        <i
+                                            @click="editRelationship(relation)"
+                                            class="fas fa-edit text-blue-500 cursor-pointer hover:text-blue-700"
+                                        ></i>
+                                        <i
+                                            @click="removeRelationship(relation)"
+                                            class="fas fa-trash-alt text-red-500 cursor-pointer hover:text-red-700 ml-2"
+                                        ></i>
+                                    </span>
+                                </p>
+                            </div>
+                            <div
+                                v-if="selectedPerson && ['Masculino', 'Feminino'].includes(selectedPerson.gender) && filteredRelations.length === 0"
                                 class="text-gray-500"
                             >
                                 Nenhuma relação nesta categoria.
                             </div>
-                            <ul class="list-disc pl-5 space-y-2" v-else>
+                            <ul
+                                v-if="selectedPerson && ['Masculino', 'Feminino'].includes(selectedPerson.gender) && filteredRelations.length > 0"
+                                class="list-disc pl-5 space-y-2"
+                            >
                                 <li
                                     v-for="(relation, index) in filteredRelations"
                                     :key="index"
@@ -315,7 +342,8 @@
         </div>
 
         <script type="text/javascript">
-            const { createApp, ref, computed, onMounted, nextTick } = Vue;
+            const { createApp, ref, computed, onMounted, nextTick, watch } =
+                Vue;
 
             const app = createApp({
                 setup() {
@@ -343,78 +371,189 @@
                     const parentescoOptions = ref([]);
                     const generoOptions = ref([]);
                     const currentTab = ref(null);
-                    const tabs = ["Mãe", "Avó", "Outros"];
+                    const tabs = ref([
+                        "Pais",
+                        "Pai",
+                        "Avô",
+                        "Mãe",
+                        "Avó",
+                        "Irmãos",
+                        "Sobrinhos",
+                        "Outros",
+                    ]);
 
-                    // Função genérica para ordenar arrays ASC
                     const sortAlphabetically = (arr, key = null) => {
-                        return [...arr].sort((a, b) => {
+                        return [...(arr || [])].sort((a, b) => {
                             const valA = key ? a[key] || "" : a;
                             const valB = key ? b[key] || "" : b;
                             return valA.localeCompare(valB);
                         });
                     };
 
-                    // Ordenação ASC para lista de pessoas
-                    const sortedPeople = computed(() => {
-                        return sortAlphabetically(people.value, "name");
-                    });
-
-                    // Ordenação ASC para lista de parentescos
-                    const sortedParentescoOptions = computed(() => {
-                        return sortAlphabetically(parentescoOptions.value);
-                    });
-
-                    // Ordenação ASC para lista de pessoas disponíveis no select de relação
-                    const sortedAvailablePeople = computed(() => {
-                        return sortAlphabetically(
-                            availablePeople.value,
-                            "name",
-                        );
-                    });
-
-                    // Ordenação ASC para lista de relações no modal de relações
-                    const sortedRelationships = computed(() => {
-                        return sortAlphabetically(
+                    const sortedPeople = computed(() =>
+                        sortAlphabetically(people.value, "name"),
+                    );
+                    const sortedParentescoOptions = computed(() =>
+                        sortAlphabetically(parentescoOptions.value),
+                    );
+                    const sortedAvailablePeople = computed(() =>
+                        sortAlphabetically(availablePeople.value, "name"),
+                    );
+                    const sortedRelationships = computed(() =>
+                        sortAlphabetically(
                             selectedPerson.value?.relationships || [],
-                        );
-                    });
+                        ),
+                    );
 
-                    // Filtro de relações por aba
                     const filteredRelations = computed(() => {
                         if (!currentTab.value) return [];
                         return sortedRelationships.value.filter((relation) => {
+                            if (currentTab.value === "Pais")
+                                return ["Filho de", "Filha de"].some((p) =>
+                                    relation.startsWith(p),
+                                );
+                            if (currentTab.value === "Pai")
+                                return relation.startsWith("Pai de");
+                            if (currentTab.value === "Avô")
+                                return relation.startsWith("Avô de");
                             if (currentTab.value === "Mãe")
                                 return relation.startsWith("Mãe de");
                             if (currentTab.value === "Avó")
                                 return relation.startsWith("Avó de");
-                            if (currentTab.value === "Outros")
-                                return (
-                                    !relation.startsWith("Mãe de") &&
-                                    !relation.startsWith("Avó de")
+                            if (currentTab.value === "Irmãos")
+                                return ["Irmão de", "Irmã de"].some((p) =>
+                                    relation.startsWith(p),
                                 );
+                            if (currentTab.value === "Sobrinhos")
+                                return ["Tio de", "Tia de"].some((p) =>
+                                    relation.startsWith(p),
+                                );
+                            if (currentTab.value === "Outros")
+                                return ![
+                                    "Filho de",
+                                    "Filha de",
+                                    "Pai de",
+                                    "Avô de",
+                                    "Mãe de",
+                                    "Avó de",
+                                    "Irmão de",
+                                    "Irmã de",
+                                    "Tio de",
+                                    "Tia de",
+                                ].some((p) => relation.startsWith(p));
                             return false;
                         });
                     });
 
-                    // Verificar se uma aba deve ser exibida
-                    const shouldShowTab = (tab) => {
+                    const visibleTabs = computed(() => {
+                        if (
+                            !selectedPerson.value ||
+                            !selectedPerson.value.relationships
+                        )
+                            return [];
                         const gender =
-                            selectedPerson.value?.gender || "Nãoespecificado";
-                        if (tab === "Mãe" && gender !== "Feminino")
-                            return false;
-                        if (tab === "Avó" && gender !== "Feminino")
-                            return false;
-                        if (tab === "Outros") {
-                            return sortedRelationships.value.some(
-                                (relation) =>
-                                    !relation.startsWith("Mãe de") &&
-                                    !relation.startsWith("Avó de"),
-                            );
+                            selectedPerson.value.gender || "Nãoespecificado";
+                        const rels = sortedRelationships.value;
+                        let prioritizedTabs = [];
+
+                        if (gender === "Masculino") {
+                            prioritizedTabs = [
+                                "Pais",
+                                "Pai",
+                                "Avô",
+                                "Irmãos",
+                                "Sobrinhos",
+                                "Outros",
+                            ].filter((tab) => {
+                                if (tab === "Pais")
+                                    return ["Filho de", "Filha de"].some((p) =>
+                                        rels.some((r) => r.startsWith(p)),
+                                    );
+                                if (tab === "Pai")
+                                    return rels.some((r) =>
+                                        r.startsWith("Pai de"),
+                                    );
+                                if (tab === "Avô")
+                                    return rels.some((r) =>
+                                        r.startsWith("Avô de"),
+                                    );
+                                if (tab === "Irmãos")
+                                    return ["Irmão de", "Irmã de"].some((p) =>
+                                        rels.some((r) => r.startsWith(p)),
+                                    );
+                                if (tab === "Sobrinhos")
+                                    return ["Tio de", "Tia de"].some((p) =>
+                                        rels.some((r) => r.startsWith(p)),
+                                    );
+                                if (tab === "Outros")
+                                    return rels.some(
+                                        (r) =>
+                                            ![
+                                                "Filho de",
+                                                "Filha de",
+                                                "Pai de",
+                                                "Avô de",
+                                                "Irmão de",
+                                                "Irmã de",
+                                                "Tio de",
+                                                "Tia de",
+                                            ].some((p) => r.startsWith(p)),
+                                    );
+                                return false;
+                            });
+                        } else if (gender === "Feminino") {
+                            prioritizedTabs = [
+                                "Pais",
+                                "Mãe",
+                                "Avó",
+                                "Irmãos",
+                                "Sobrinhos",
+                                "Outros",
+                            ].filter((tab) => {
+                                if (tab === "Pais")
+                                    return ["Filho de", "Filha de"].some((p) =>
+                                        rels.some((r) => r.startsWith(p)),
+                                    );
+                                if (tab === "Mãe")
+                                    return rels.some((r) =>
+                                        r.startsWith("Mãe de"),
+                                    );
+                                if (tab === "Avó")
+                                    return rels.some((r) =>
+                                        r.startsWith("Avó de"),
+                                    );
+                                if (tab === "Irmãos")
+                                    return ["Irmão de", "Irmã de"].some((p) =>
+                                        rels.some((r) => r.startsWith(p)),
+                                    );
+                                if (tab === "Sobrinhos")
+                                    return ["Tio de", "Tia de"].some((p) =>
+                                        rels.some((r) => r.startsWith(p)),
+                                    );
+                                if (tab === "Outros")
+                                    return rels.some(
+                                        (r) =>
+                                            ![
+                                                "Filho de",
+                                                "Filha de",
+                                                "Mãe de",
+                                                "Avó de",
+                                                "Irmão de",
+                                                "Irmã de",
+                                                "Tio de",
+                                                "Tia de",
+                                            ].some((p) => r.startsWith(p)),
+                                    );
+                                return false;
+                            });
+                        } else {
+                            return [];
                         }
-                        return sortedRelationships.value.some((relation) =>
-                            relation.startsWith(tab + " de"),
-                        );
-                    };
+
+                        return prioritizedTabs.length > 0
+                            ? prioritizedTabs
+                            : [];
+                    });
 
                     const addPerson = async () => {
                         if (!newPerson.value.name || !newPerson.value.gender) {
@@ -504,7 +643,7 @@
                             alert("Pessoa ou relação inválida!");
                             return;
                         }
-                        const newRelationship = `${relationshipType.value} de ${relatedPerson.name}`;
+                        let newRelationship = `${relationshipType.value} de ${relatedPerson.name}`;
                         personToUpdate.relationships =
                             personToUpdate.relationships || [];
                         if (
@@ -529,25 +668,10 @@
                             personToUpdate.relationships.push(newRelationship);
                         }
 
-                        // Auto-relation: Adicionar relação inversa com base no gênero
-                        const inverseRelationship = getInverseRelationship(
+                        let inverseRelationship = getInverseRelationship(
                             relationshipType.value,
                             personToUpdate,
                             relatedPerson,
-                        );
-                        console.log(
-                            "grandparentGender:",
-                            personToUpdate.gender === "Feminino"
-                                ? "Avó"
-                                : "Avô",
-                        );
-                        console.log(
-                            "New:",
-                            newRelationship,
-                            "Inverse:",
-                            inverseRelationship,
-                            "Gender:",
-                            personToUpdate.gender,
                         );
                         if (
                             inverseRelationship &&
@@ -614,24 +738,31 @@
                                 child: "Filho",
                                 parent: "Pai",
                                 grandparent: "Avô",
+                                sibling: "Irmão",
+                                uncle: "Tio",
+                                cousin: "Primo",
                             },
                             Feminino: {
                                 child: "Filha",
                                 parent: "Mãe",
                                 grandparent: "Avó",
+                                sibling: "Irmã",
+                                uncle: "Tia",
+                                cousin: "Prima",
                             },
                             Nãoespecificado: {
                                 child: "Filho",
                                 parent: "Pai",
                                 grandparent: "Avô",
+                                sibling: "Irmão",
+                                uncle: "Tio",
+                                cousin: "Primo",
                             },
                         };
-
                         const personGender =
                             personToUpdate.gender || "Nãoespecificado";
                         const relatedGender =
                             relatedPerson.gender || "Nãoespecificado";
-
                         const inverseMap = {
                             Pai: `${genderMap[relatedGender].child} de`,
                             Mãe: `${genderMap[relatedGender].child} de`,
@@ -641,26 +772,31 @@
                             Avó: `${genderMap[relatedGender].child === "Filho" ? "Neto" : "Neta"} de`,
                             Neto: `${genderMap[personGender].grandparent} de`,
                             Neta: `${genderMap[personGender].grandparent} de`,
+                            Irmão: `${genderMap[relatedGender].sibling} de`,
+                            Irmã: `${genderMap[relatedGender].sibling} de`,
+                            Tio: `${genderMap[relatedGender].child === "Filho" ? "Sobrinho" : "Sobrinha"} de`,
+                            Tia: `${genderMap[relatedGender].child === "Filho" ? "Sobrinho" : "Sobrinha"} de`,
+                            Primo: `${genderMap[relatedGender].cousin} de`,
+                            Prima: `${genderMap[relatedGender].cousin} de`,
                         };
-
                         return inverseMap[type]
                             ? `${inverseMap[type]} ${personToUpdate.name}`
                             : null;
                     };
 
-                    const openRelationsModal = (person) => {
+                    const openRelationsModal = async (person) => {
                         selectedPerson.value = {
                             ...people.value.find((p) => p.id === person.id),
                         };
-                        // Definir a aba inicial com prioridade para "Mãe" se houver relações "Mãe de ..."
-                        if (shouldShowTab("Mãe")) {
-                            currentTab.value = "Mãe";
-                        } else if (shouldShowTab("Avó")) {
-                            currentTab.value = "Avó";
-                        } else if (shouldShowTab("Outros")) {
-                            currentTab.value = "Outros";
-                        }
+                        await nextTick();
+                        console.log(
+                            "openRelationsModal: Selected person",
+                            selectedPerson.value.name,
+                            "relationships",
+                            selectedPerson.value.relationships,
+                        );
                         isRelationsModalOpen.value = true;
+                        updateInitialTab();
                     };
 
                     const closeRelationsModal = () => {
@@ -679,9 +815,7 @@
                             (p) => p.id === selectedPerson.value.id,
                         );
                         if (personToUpdate && personToUpdate.relationships) {
-                            const removedRelation =
-                                personToUpdate.relationships[originalIndex];
-                            const [type, name] = removedRelation.split(" de ");
+                            const [type, name] = relation.split(" de ");
                             const relatedPerson = people.value.find(
                                 (p) => p.name === name,
                             );
@@ -693,7 +827,6 @@
                                 ...personToUpdate.relationships,
                             ];
 
-                            // Remover relação inversa, se existir
                             if (relatedPerson) {
                                 const inverseType = getInverseType(type);
                                 const inverseRelation = `${inverseType} ${personToUpdate.name}`;
@@ -765,6 +898,12 @@
                             Avó: "Neto de",
                             Neto: "Avô de",
                             Neta: "Avô de",
+                            Irmão: "Irmão de",
+                            Irmã: "Irmã de",
+                            Tio: "Sobrinho de",
+                            Tia: "Sobrinho de",
+                            Primo: "Primo de",
+                            Prima: "Prima de",
                         };
                         return inverseMap[type] || type;
                     };
@@ -794,19 +933,16 @@
                         }
                     };
 
-                    const availablePeople = computed(() => {
-                        return people.value.filter(
+                    const availablePeople = computed(() =>
+                        people.value.filter(
                             (p) => p.id !== selectedPerson.value?.id,
-                        );
-                    });
+                        ),
+                    );
 
                     const formatDate = (date) => {
                         if (!date) return "N/A";
                         const d = new Date(date);
-                        const day = String(d.getDate()).padStart(2, "0");
-                        const month = String(d.getMonth() + 1).padStart(2, "0");
-                        const year = d.getFullYear();
-                        return `${day}/${month}/${year}`;
+                        return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
                     };
 
                     const fetchPeople = async () => {
@@ -815,8 +951,7 @@
                                 "http://localhost:3000/people",
                             );
                             if (response.ok) {
-                                const data = await response.json();
-                                people.value = data;
+                                people.value = await response.json();
                                 await nextTick();
                             } else {
                                 throw new Error("Erro ao carregar pessoas");
@@ -833,8 +968,7 @@
                                 "http://localhost:3000/parentescos",
                             );
                             if (response.ok) {
-                                const data = await response.json();
-                                parentescoOptions.value = data;
+                                parentescoOptions.value = await response.json();
                             } else {
                                 throw new Error("Erro ao carregar parentescos");
                             }
@@ -853,8 +987,7 @@
                                 "http://localhost:3000/generos",
                             );
                             if (response.ok) {
-                                const data = await response.json();
-                                generoOptions.value = data;
+                                generoOptions.value = await response.json();
                             } else {
                                 throw new Error("Erro ao carregar gêneros");
                             }
@@ -863,6 +996,41 @@
                             alert("Erro ao carregar gêneros!");
                         }
                     };
+
+                    const updateInitialTab = () => {
+                        if (
+                            !selectedPerson.value ||
+                            !selectedPerson.value.relationships
+                        ) {
+                            currentTab.value = null;
+                            return;
+                        }
+                        console.log(
+                            "updateInitialTab: Checking tabs",
+                            selectedPerson.value.name,
+                            selectedPerson.value.relationships,
+                        );
+                        if (visibleTabs.value.length > 0) {
+                            currentTab.value = visibleTabs.value[0];
+                        } else {
+                            currentTab.value = null;
+                        }
+                        console.log(
+                            "updateInitialTab: Set to",
+                            currentTab.value,
+                        );
+                    };
+
+                    watch(selectedPerson, (newValue) => {
+                        if (newValue && isRelationsModalOpen.value) {
+                            console.log(
+                                "watch: selectedPerson updated",
+                                newValue.name,
+                                newValue.relationships,
+                            );
+                            updateInitialTab();
+                        }
+                    });
 
                     onMounted(async () => {
                         await Promise.all([
@@ -901,8 +1069,8 @@
                         formatDate,
                         fetchPeople,
                         currentTab,
-                        tabs,
-                        shouldShowTab,
+                        visibleTabs,
+                        updateInitialTab,
                     };
                 },
             });
