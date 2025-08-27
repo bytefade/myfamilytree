@@ -10,6 +10,15 @@
             rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
         />
+        <style>
+            .clickable-icon {
+                color: #3b82f6;
+                cursor: pointer;
+            }
+            .clickable-icon:hover {
+                color: #1e40af;
+            }
+        </style>
     </head>
     <body>
         <div id="app" class="min-h-screen bg-gray-100 p-4">
@@ -287,8 +296,13 @@
                                     :key="index"
                                     class="pl-5"
                                 >
-                                    {{ relation }}
+                                    {{ formatRelation(relation) }}
                                     <span class="ml-2">
+                                        <i
+                                            @click="navigateByName(relation.split(' de ')[1])"
+                                            class="fas fa-link clickable-icon mr-2"
+                                            title="Navegar para a pessoa"
+                                        ></i>
                                         <i
                                             @click="editRelationship(relation)"
                                             class="fas fa-edit text-blue-500 cursor-pointer hover:text-blue-700"
@@ -314,8 +328,13 @@
                                     v-for="(relation, index) in filteredRelations"
                                     :key="index"
                                 >
-                                    {{ relation }}
+                                    {{ formatRelation(relation) }}
                                     <span class="ml-2">
+                                        <i
+                                            @click="navigateByName(relation.split(' de ')[1])"
+                                            class="fas fa-link clickable-icon mr-2"
+                                            title="Navegar para a pessoa"
+                                        ></i>
                                         <i
                                             @click="editRelationship(relation)"
                                             class="fas fa-edit text-blue-500 cursor-pointer hover:text-blue-700"
@@ -664,7 +683,7 @@
                             alert("Pessoa ou relação inválida!");
                             return;
                         }
-                        let newRelationship = `${relationshipType.value} de ${relatedPerson.name}`;
+                        const newRelationship = `${relationshipType.value} de ${relatedPerson.name}`;
                         personToUpdate.relationships =
                             personToUpdate.relationships || [];
                         if (
@@ -689,7 +708,7 @@
                             personToUpdate.relationships.push(newRelationship);
                         }
 
-                        let inverseRelationship = getInverseRelationship(
+                        const inverseRelationship = getInverseRelationship(
                             relationshipType.value,
                             personToUpdate,
                             relatedPerson,
@@ -1042,6 +1061,25 @@
                         );
                     };
 
+                    const formatRelation = (relation) => {
+                        const [type, name] = relation.split(" de ");
+                        return `${type} de ${name}`;
+                    };
+
+                    const navigateByName = async (name) => {
+                        console.log("navigateByName called for:", name); // Log para depuração
+                        const relatedPerson = people.value.find(
+                            (p) => p.name === name,
+                        );
+                        if (relatedPerson) {
+                            closeRelationsModal();
+                            await nextTick();
+                            openRelationsModal(relatedPerson);
+                        } else {
+                            console.error("Pessoa não encontrada:", name);
+                        }
+                    };
+
                     watch(selectedPerson, (newValue) => {
                         if (newValue && isRelationsModalOpen.value) {
                             console.log(
@@ -1092,6 +1130,8 @@
                         currentTab,
                         visibleTabs,
                         updateInitialTab,
+                        formatRelation,
+                        navigateByName,
                     };
                 },
             });
