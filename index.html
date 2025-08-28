@@ -829,12 +829,6 @@
                             ...people.value.find((p) => p.id === person.id),
                         };
                         await nextTick();
-                        console.log(
-                            "openRelationsModal: Selected person",
-                            selectedPerson.value.name,
-                            "relationships",
-                            selectedPerson.value.relationships,
-                        );
                         isRelationsModalOpen.value = true;
                         updateInitialTab();
                     };
@@ -1045,29 +1039,46 @@
                             currentTab.value = null;
                             return;
                         }
-                        console.log(
-                            "updateInitialTab: Checking tabs",
-                            selectedPerson.value.name,
-                            selectedPerson.value.relationships,
-                        );
                         if (visibleTabs.value.length > 0) {
                             currentTab.value = visibleTabs.value[0];
                         } else {
                             currentTab.value = null;
                         }
-                        console.log(
-                            "updateInitialTab: Set to",
-                            currentTab.value,
-                        );
                     };
 
                     const formatRelation = (relation) => {
                         const [type, name] = relation.split(" de ");
+                        const relatedPerson = people.value.find(
+                            (p) => p.name === name,
+                        );
+                        if (!relatedPerson || !selectedPerson.value)
+                            return `${type} de ${name}`;
+
+                        const degree = calculateRelationshipDegree(
+                            selectedPerson.value,
+                            relatedPerson,
+                        );
+                        if (
+                            degree.includes("Primo") &&
+                            Math.abs(
+                                getGeneration(selectedPerson.value) -
+                                    getGeneration(relatedPerson),
+                            ) > 1
+                        ) {
+                            return `${degree} ${name}`;
+                        } else if (
+                            degree.includes("Neto") &&
+                            Math.abs(
+                                getGeneration(selectedPerson.value) -
+                                    getGeneration(relatedPerson),
+                            ) === 2
+                        ) {
+                            return `Bis${type.toLowerCase()} de ${name}`;
+                        }
                         return `${type} de ${name}`;
                     };
 
                     const navigateByName = async (name) => {
-                        console.log("navigateByName called for:", name); // Log para depuração
                         const relatedPerson = people.value.find(
                             (p) => p.name === name,
                         );
@@ -1080,13 +1091,56 @@
                         }
                     };
 
+                    const calculateRelationshipDegree = (
+                        person,
+                        relatedPerson,
+                    ) => {
+                        const myIndex = people.value.findIndex(
+                            (p) => p.id === person.id,
+                        );
+                        const relatedIndex = people.value.findIndex(
+                            (p) => p.id === relatedPerson.id,
+                        );
+                        if (myIndex === -1 || relatedIndex === -1) return "";
+
+                        const myGeneration = getGeneration(person);
+                        const relatedGeneration = getGeneration(relatedPerson);
+                        const generationDiff = relatedGeneration - myGeneration;
+
+                        if (generationDiff === 0) {
+                            if (person.siblingsIds.includes(relatedPerson.id))
+                                return "Irmão";
+                            return "Primo";
+                        } else if (generationDiff === 1) {
+                            return "Filho";
+                        } else if (generationDiff === -1) {
+                            return "Pai";
+                        } else if (generationDiff === 2) {
+                            return "Neto";
+                        } else if (generationDiff === -2) {
+                            return "Avô";
+                        } else if (Math.abs(generationDiff) > 1) {
+                            return `Primo ${Math.abs(generationDiff - 1)}º`;
+                        }
+                        return type;
+                    };
+
+                    const getGeneration = (person) => {
+                        let generation = 0;
+                        let current = person;
+                        while (current.parentIds.length > 0) {
+                            const parent = people.value.find(
+                                (p) => p.id === current.parentIds[0],
+                            );
+                            if (!parent) break;
+                            generation--;
+                            current = parent;
+                        }
+                        return generation;
+                    };
+
                     watch(selectedPerson, (newValue) => {
                         if (newValue && isRelationsModalOpen.value) {
-                            console.log(
-                                "watch: selectedPerson updated",
-                                newValue.name,
-                                newValue.relationships,
-                            );
                             updateInitialTab();
                         }
                     });
@@ -1132,6 +1186,8 @@
                         updateInitialTab,
                         formatRelation,
                         navigateByName,
+                        calculateRelationshipDegree,
+                        getGeneration,
                     };
                 },
             });
